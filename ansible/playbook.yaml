@@ -1,0 +1,14 @@
+---
+- name : Install Nginx and PHP
+  hosts: tag_Packages_nginx
+  become: yes
+
+  roles:
+    - { role: nginx_php, when: ansible_system == 'Linux' }
+
+- name : Install PHPmyadmin
+  hosts: tag_Packages_pma
+  become: yes
+
+  roles:
+    - { role: phpmyadmin, when: ansible_system == 'Linux' }

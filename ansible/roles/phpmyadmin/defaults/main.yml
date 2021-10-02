@@ -1,0 +1,5 @@
+---
+packages_apt  :
+  - nginx
+  - python3-mysqldb
+  - phpmyadmin

@@ -1,0 +1,37 @@
+- block: # -------- For DEBIAN ---------
+
+    - name: Installing Packages for DEBIAN
+      apt:
+        name: "{{ packages_apt }}"
+        update_cache: yes
+        state: present
+
+    - name: Remove default nginx configuration
+      file:
+        state: absent
+        path: /etc/nginx/sites-enabled/default
+
+    - name: Check that the Nginx conf exists
+      stat:
+        path: /etc/nginx/conf.d/phpdeb.conf
+      register: nginx_conf
+
+    - name: Add base Nginx configuration file
+      copy:
+        dest: /etc/nginx/conf.d
+        src: phpdeb.conf
+        owner: root
+        group: root
+        mode: 0644
+      notify: Restart Nginx
+      when: not nginx_conf.stat.exists
+
+
+  when: ansible_os_family == "Debian" and ansible_lsb.major_release|int >= 16
+
+- name: Strat Nginx And Enable it on the every boot
+  service:
+    name: nginx
+    state: started
+    enabled: yes
+

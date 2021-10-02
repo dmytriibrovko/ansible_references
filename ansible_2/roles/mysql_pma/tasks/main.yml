@@ -1,0 +1,166 @@
+- block: # -------- For DEBIAN ---------
+
+  - name: Installing Packages for DEBIAN
+    apt:
+      name: "{{ packages_apt }}"
+      update_cache: yes
+      state: present
+
+  - name: Start mysql service
+    service: name=mysql state=started
+
+  - name: Update mysql root password for all root accounts
+    mysql_user:
+      name: root
+      host: "{{ item }}"
+      password: "{{ mysql_root_password }}"
+      login_user: root
+      login_password: "{{ mysql_root_password }}"
+      check_implicit_admin: yes
+      priv: "*.*:ALL,GRANT"
+    with_items:
+      - 127.0.0.1
+      - ::1
+      - localhost
+
+  - name: Copy MySQL root password to .my.cnf
+    template:
+      src: root_my.cnf.j2
+      dest: /root/.my.cnf
+      force: yes
+
+  - name: Add base PMA configuration file config-db
+    template:
+      dest: /etc/phpmyadmin/config-db.php
+      src: config-db.php.j2
+      owner: root
+      group: root
+      mode: 0644
+      force: yes
+
+  - name: Add base PMA configuration file phpmyadmin.conf
+    template:
+      dest: /etc/dbconfig-common/phpmyadmin.conf
+      src: phpmyadmin.conf.j2
+      owner: root
+      group: root
+      mode: 0644
+      force: yes
+
+  - name: Add PMA configuration config.inc.php
+    template:
+      dest: /etc/phpmyadmin/config.inc.php
+      src: ubuntu_config.inc.php.j2
+      owner: root
+      group: root
+      mode: 0644
+      force: yes
+
+  - name: Link nginx and pma
+    file: path=/var/www/html/phpmyadmin src=/usr/share/phpmyadmin state=link
+    notify: Restart Nginx
+
+  when: ansible_os_family == "Debian" and ansible_lsb.major_release|int >= 16
+
+
+- block: # ----------- For REDHAT -------------
+  - name: Enable php74 and epel repositories for AmazonLinux
+    shell: amazon-linux-extras enable php7.4 epel
+    when: ansible_distribution == "Amazon"
+
+  - name: Enable RedHat epel repositories and set
+    shell: dnf install https://dl.fedoraproject.org/pub/epel/epel-release-latest-8.noarch.rpm -y
+    when: ansible_distribution == "RedHat"
+
+  - name: Add MySQL RMP GPG key
+    rpm_key:
+      state: present
+      key: https://repo.mysql.com/RPM-GPG-KEY-mysql
+
+  - name: Add MySQL repositories
+    yum:
+      name: https://dev.mysql.com/get/mysql57-community-release-el7-11.noarch.rpm
+      update_cache: yes
+      state: present
+
+  - name: Enable MySQL 5.7 repositories
+    shell: |
+      yum-config-manager --enable mysql57-community
+      yum module disable mysql -y
+    when: ansible_distribution == "RedHat"
+
+  - name: Installing Packages for AmazonLinux
+    yum:
+      name: "{{ packages_yum_amazon }}"
+      update_cache: yes
+      state: present
+    when: ansible_distribution == "Amazon"
+
+  - name: Installing Packages for REDHAT
+    yum:
+      name: "{{ packages_yum_redhat }}"
+      update_cache: yes
+      state: present
+    when: ansible_distribution == "RedHat"
+
+  - name: Start MySQL service
+    service: name=mysqld state=started
+
+  - shell: cat /var/log/mysqld.log | grep "temporary password" | grep -oE '[^ ]+$'
+    register: tmp_root_password
+
+  - name: Detect and set root password in MySQL
+    stat:
+      path: /root/.my.cnf
+    register: r
+  - mysql_user:
+      name: root
+      password: "{{ mysql_root_password }}"
+    when: r.stat.exists==True
+  - name: Set new password from temporary password
+    shell: 'mysql -e "SET PASSWORD = PASSWORD(''{{ mysql_root_password }}'');" --connect-expired-password -uroot -p"{{ tmp_root_password.stdout }}"'
+    when: r.stat.exists==False
+
+  - name: Copy MySQL root password to .my.cnf
+    template:
+      src: root_my.cnf.j2
+      dest: /root/.my.cnf
+      force: yes
+
+  - name: Check that the phpmyadmin exists
+    stat:
+      path: /usr/share/nginx/html/phpmyadmin
+    register: stat_result
+  - name: Download PHPmyadmin
+    get_url:
+      url: https://files.phpmyadmin.net/phpMyAdmin/5.1.0/phpMyAdmin-5.1.0-all-languages.zip
+      dest: /usr/share/
+    when: not stat_result.stat.exists
+  - name: Unarchive a PHPmyadmin
+    unarchive:
+      src: /usr/share/phpMyAdmin-5.1.0-all-languages.zip
+      dest: /usr/share/
+      remote_src: yes
+    when: not stat_result.stat.exists
+  - name: Link nginx and pma
+    command: mv /usr/share/phpMyAdmin-5.1.0-all-languages /usr/share/nginx/html/phpmyadmin
+    when: not stat_result.stat.exists
+
+  - name: Add PMA configuration
+    template:
+      dest: /usr/share/nginx/html/phpmyadmin/config.inc.php
+      src: amazon_config.inc.php.j2
+      owner: root
+      group: root
+      mode: 0644
+      force: yes
+
+  when: ansible_os_family == "RedHat"
+
+- name: Create new user for PMA
+  mysql_user:
+    name: manager
+    password: '{{ mysql_manager_password }}'
+    priv: '*.*:ALL,GRANT'
+    state: present
+

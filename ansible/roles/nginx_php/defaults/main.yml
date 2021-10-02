@@ -1,0 +1,18 @@
+---
+ packages_apt:
+  - nginx
+  - php-fpm
+  - php-mysql
+ packages_yum:
+  - epel-release
+  - nginx
+  - php
+  - php-pear
+  - php-common
+  - php-fpm
+  - php-gd
+  - php-intl
+  - php-json
+  - php-mbstring
+  - php-mysqlnd
+  - php-xml

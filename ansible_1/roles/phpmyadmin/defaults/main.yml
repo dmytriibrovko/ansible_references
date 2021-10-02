@@ -1,0 +1,6 @@
+---
+mysql_root_password: '299792458'
+packages_apt:
+  - nginx
+  - phpmyadmin
+  - python3-mysqldb

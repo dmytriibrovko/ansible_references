@@ -1,0 +1,40 @@
+- block: # -------- For DEBIAN ---------
+
+  - name: Installing Packages for DEBIAN
+    apt:
+      name: "{{ packages_apt }}"
+      update_cache: yes
+      state: present
+
+  - name: Add base PMA configuration file config-db
+    template:
+      dest: /etc/phpmyadmin/config-db.php
+      src: config-db.php.j2
+      owner: root
+      group: root
+      mode: 0644
+      force: yes
+
+  - name: Add base PMA configuration file phpmyadmin.conf
+    template:
+      dest: /etc/dbconfig-common/phpmyadmin.conf
+      src: phpmyadmin.conf.j2
+      owner: root
+      group: root
+      mode: 0644
+      force: yes
+
+  - name: Add PMA configuration config.inc.php
+    template:
+      dest: /etc/phpmyadmin/config.inc.php
+      src: ubuntu_config.inc.php.j2
+      owner: root
+      group: root
+      mode: 0644
+      force: yes
+
+  - name: Link nginx and pma
+    file: path=/var/www/html/phpmyadmin src=/usr/share/phpmyadmin state=link
+
+  when: ansible_os_family == "Debian" and ansible_lsb.major_release|int >= 16
+

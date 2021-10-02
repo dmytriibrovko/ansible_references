@@ -1,0 +1,70 @@
+- block: # -------- For DEBIAN ---------
+
+    - name: Installing Packages for DEBIAN
+      apt:
+        name: "{{ packages_apt }}"
+        update_cache: yes
+        state: present
+
+    - name: Remove default nginx configuration
+      file:
+        state: absent
+        path: /etc/nginx/sites-enabled/default
+
+    - name: Check that the Nginx conf exists
+      stat:
+        path: /etc/nginx/conf.d/phpdeb.conf
+      register: nginx_conf
+
+    - name: Add base Nginx configuration file
+      copy:
+        dest: /etc/nginx/conf.d
+        src: phpdeb.conf
+        owner: root
+        group: root
+        mode: 0644
+      notify: Restart Nginx
+      when: not nginx_conf.stat.exists
+
+
+  when: ansible_os_family == "Debian" and ansible_lsb.major_release|int >= 16
+
+- block: # ----------- For REDHAT -------------
+    - name: Enable php74 and epel repositories for AmazonLinux
+      shell: amazon-linux-extras enable php7.4 epel nginx1
+      when: ansible_distribution == "Amazon"
+
+    - name: Enable epel repositories for RedHat
+      shell: dnf install https://dl.fedoraproject.org/pub/epel/epel-release-latest-8.noarch.rpm -y
+      when: ansible_distribution == "RedHat"
+
+    - name: Installing Packages for REDHAT
+      yum:
+        name: "{{ packages_yum }}"
+        update_cache: yes
+        state: present
+
+#    - name: Check that the Nginx conf exists
+#      stat:
+#        path: /etc/nginx/conf.d/phpdeb.conf
+#      register: nginx_conf
+#
+#    - name: Add base Nginx configuration file
+#      copy:
+#        dest: /etc/nginx/conf.d
+#        src: phprh.conf
+#        owner: root
+#        group: root
+#        mode: 0644
+#      notify: Restart Nginx
+#      when: not nginx_conf.stat.exists
+
+
+  when: ansible_os_family == "RedHat"
+
+- name: Strat Nginx And Enable it on the every boot
+  service:
+    name: nginx
+    state: started
+    enabled: yes
+
